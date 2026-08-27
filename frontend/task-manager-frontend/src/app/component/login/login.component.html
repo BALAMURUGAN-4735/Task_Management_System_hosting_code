@@ -1,0 +1,126 @@
+<div class="login-container">
+  <mat-card class="auth-card">
+    <mat-card-header class="auth-header">
+      <mat-icon class="brand-icon">task_alt</mat-icon>
+      <mat-card-title>Enterprise Task Suite</mat-card-title>
+      <mat-card-subtitle>Secure Single Sign-On Portal</mat-card-subtitle>
+    </mat-card-header>
+
+    <!-- Global Error & Success Alerts Container -->
+    <div class="alerts-wrapper">
+      <p class="error-alert" *ngIf="errorMessage">{{ errorMessage }}</p>
+      <p class="success-alert" *ngIf="successMessage">{{ successMessage }}</p>
+    </div>
+
+    <mat-tab-group dynamicHeight (selectedTabChange)="clearAlerts()">
+      <!-- LOGIN TAB -->
+      <mat-tab label="Sign In">
+        <div class="tab-body">
+          <form [formGroup]="loginForm" (ngSubmit)="onLogin()">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Email Address</mat-label>
+              <input matInput formControlName="email" type="email" placeholder="name@company.com">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Password</mat-label>
+              <input matInput [type]="hideLoginPassword ? 'password' : 'text'" formControlName="password">
+              <button mat-icon-button matSuffix type="button" (click)="$event.preventDefault();$event.stopPropagation(); hideLoginPassword = !hideLoginPassword">
+                <mat-icon>{{ hideLoginPassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+              </button>
+            </mat-form-field>
+
+            <button mat-raised-button color="primary" class="full-width action-btn" type="submit" [disabled]="loginForm.invalid">
+              Sign In
+            </button>
+          </form>
+
+          <!-- Divider with "OR" text -->
+          <div class="auth-divider">
+            <span>OR</span>
+          </div>
+
+          <!-- Modern Google Sign-In Button -->
+          <button type="button" class="google-auth-btn" (click)="loginWithGoogle()">
+            <svg class="google-icon" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.13 0-5.78-2.11-6.73-4.96H1.17v3.15C3.16 21.32 7.22 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.27 14.24c-.25-.72-.38-1.49-.38-2.24s.13-1.52.38-2.24V6.6H1.17C.42 8.13 0 9.87 0 12s.42 3.87 1.17 5.4l4.1-3.16z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.22 0 3.16 2.68 1.17 6.6l4.1 3.15c.95-2.85 3.6-4.96 6.73-4.96z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+        </div>
+      </mat-tab>
+
+      <!-- REGISTER TAB -->
+      <mat-tab label="Request Access">
+        <div class="tab-body">
+          <form [formGroup]="registerForm" (ngSubmit)="onRegister()">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Full Name</mat-label>
+              <input matInput formControlName="name">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Email Address</mat-label>
+              <input matInput formControlName="email" type="email">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Password</mat-label>
+              <input matInput [type]="hideRegPassword ? 'password' : 'text'" formControlName="password">
+              <button mat-icon-button matSuffix type="button" (click)="$event.preventDefault();$event.stopPropagation(); hideRegPassword = !hideRegPassword">
+                <mat-icon>{{ hideRegPassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+              </button>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Requested Role</mat-label>
+              <mat-select formControlName="role">
+                <mat-option value="ROLE_EMPLOYEE">Employee</mat-option>
+                <mat-option value="ROLE_PROJECT_MANAGER">Project Manager</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <button mat-raised-button color="accent" class="full-width action-btn" type="submit" [disabled]="registerForm.invalid">
+              Submit Access Request
+            </button>
+          </form>
+        </div>
+      </mat-tab>
+
+      <!-- FORGOT PASSWORD TAB -->
+      <mat-tab label="Reset Password">
+        <div class="tab-body">
+          <form [formGroup]="forgotForm" (ngSubmit)="onForgotPassword()">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Registered Email</mat-label>
+              <input matInput formControlName="email" type="email">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>New Password</mat-label>
+              <input matInput [type]="hideNewPassword ? 'password' : 'text'" formControlName="newPassword">
+              <button mat-icon-button matSuffix type="button" (click)="$event.preventDefault();$event.stopPropagation(); hideNewPassword = !hideNewPassword">
+                <mat-icon>{{ hideNewPassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+              </button>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Confirm Password</mat-label>
+              <input matInput [type]="hideConfirmPassword ? 'password' : 'text'" formControlName="confirmPassword">
+              <button mat-icon-button matSuffix type="button" (click)="$event.preventDefault();$event.stopPropagation(); hideConfirmPassword = !hideConfirmPassword">
+                <mat-icon>{{ hideConfirmPassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+              </button>
+            </mat-form-field>
+
+            <button mat-raised-button color="warn" class="full-width action-btn" type="submit" [disabled]="forgotForm.invalid">
+              Update Password
+            </button>
+          </form>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card>
+</div>

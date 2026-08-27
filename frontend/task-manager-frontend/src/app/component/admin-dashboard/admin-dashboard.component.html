@@ -1,0 +1,862 @@
+<app-navbar></app-navbar>
+
+<div class="app-layout">
+  <!-- LEFT SIDEBAR NAVIGATION DRAWER -->
+  <aside class="sidebar-drawer">
+    <div class="sidebar-header">
+      <span class="sidebar-title">ADMIN CONTROL CENTER</span>
+    </div>
+
+    <mat-nav-list class="nav-list">
+      <a mat-list-item [class.active]="activeModule === 'dashboard'" (click)="activeModule = 'dashboard'">
+        <mat-icon matListItemIcon>dashboard</mat-icon>
+        <span matListItemTitle>Dashboard Overview</span>
+      </a>
+
+      <a mat-list-item [class.active]="activeModule === 'projects'" (click)="activeModule = 'projects'">
+        <mat-icon matListItemIcon>inventory_2</mat-icon>
+        <span matListItemTitle>System Projects</span>
+      </a>
+
+      <a mat-list-item [class.active]="activeModule === 'users'" (click)="activeModule = 'users'">
+        <mat-icon matListItemIcon>how_to_reg</mat-icon>
+        <span matListItemTitle>User Approvals</span>
+        <span class="nav-badge" *ngIf="pendingRequests > 0">{{ pendingRequests }}</span>
+      </a>
+
+      <!-- MODULE 1: PROJECT TEAM & ALLOCATION -->
+      <a mat-list-item [class.active]="activeModule === 'team-allocation'" (click)="activeModule = 'team-allocation'">
+        <mat-icon matListItemIcon>group_work</mat-icon>
+        <span matListItemTitle>Project Team Allocation</span>
+      </a>
+
+      <!-- MODULE 2: USER DETAILS & BLOCK/UNBLOCK MANAGEMENT -->
+      <a mat-list-item [class.active]="activeModule === 'user-details'" (click)="activeModule = 'user-details'">
+        <mat-icon matListItemIcon>admin_panel_settings</mat-icon>
+        <span matListItemTitle>User Security & Details</span>
+      </a>
+
+      <a mat-list-item [class.active]="activeModule === 'audit'" (click)="activeModule = 'audit'">
+        <mat-icon matListItemIcon>history</mat-icon>
+        <span matListItemTitle>Audit Logs</span>
+      </a>
+    </mat-nav-list>
+  </aside>
+
+  <!-- MAIN WORKSPACE -->
+  <main class="main-content">
+
+    <!-- KPI CARDS ONLY ON DASHBOARD OVERVIEW -->
+    <div class="kpi-grid" *ngIf="activeModule === 'dashboard'">
+      <div class="kpi-card blue">
+        <mat-icon class="kpi-icon">inventory_2</mat-icon>
+        <div class="kpi-info">
+          <span class="kpi-value">{{ totalProjects }}</span>
+          <span class="kpi-label">TOTAL PROJECTS</span>
+        </div>
+      </div>
+
+      <div class="kpi-card green">
+        <mat-icon class="kpi-icon">bolt</mat-icon>
+        <div class="kpi-info">
+          <span class="kpi-value">{{ activeProjects }}</span>
+          <span class="kpi-label">ACTIVE PROJECTS</span>
+        </div>
+      </div>
+
+      <div class="kpi-card orange">
+        <mat-icon class="kpi-icon">person_add</mat-icon>
+        <div class="kpi-info">
+          <span class="kpi-value">{{ pendingRequests }}</span>
+          <span class="kpi-label">PENDING REQUESTS</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- WELCOME CARD -->
+    <div class="module-view" *ngIf="activeModule === 'dashboard'">
+      <mat-card class="welcome-card">
+        <h3>System Overview & Quick Actions</h3>
+        <p>Manage projects, configure team allocations, review account restrictions, and audit logs from the sidebar.</p>
+        <div class="quick-actions">
+          <button mat-raised-button color="primary" (click)="openCreateModal()">
+            <mat-icon>add</mat-icon> Create Project
+          </button>
+          <button mat-stroked-button color="accent" (click)="openBulkUploadModal()">
+             <mat-icon>upload_file</mat-icon> Bulk Import
+          </button>
+          <button mat-stroked-button (click)="activeModule = 'users'">
+            <mat-icon>how_to_reg</mat-icon> Review Approvals
+          </button>
+        </div>
+      </mat-card>
+    </div>
+
+    <!-- MODULE 1: SYSTEM PROJECTS -->
+    <div class="module-view" *ngIf="activeModule === 'projects'">
+      <div class="filter-toolbar">
+        <mat-form-field appearance="outline" class="search-box">
+          <mat-label>Search projects...</mat-label>
+          <input matInput [(ngModel)]="projectSearchQuery" (keyup)="applyProjectFilters()">
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+
+        <div class="dropdown-group">
+          <mat-form-field appearance="outline" class="filter-select">
+            <mat-label>Filter Manager</mat-label>
+            <mat-select [(ngModel)]="selectedManagerFilter" (selectionChange)="applyProjectFilters()">
+              <mat-option value="ALL">All Managers</mat-option>
+              <mat-option *ngFor="let m of managers" [value]="m.id">{{ m.name }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-select">
+            <mat-label>Filter Status</mat-label>
+            <mat-select [(ngModel)]="selectedStatusFilter" (selectionChange)="applyProjectFilters()">
+              <mat-option value="ALL">All Statuses</mat-option>
+              <mat-option value="PLANNED">PLANNED</mat-option>
+              <mat-option value="ACTIVE">ACTIVE</mat-option>
+              <mat-option value="COMPLETED">COMPLETED</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-stroked-button [matMenuTriggerFor]="exportMenu">
+            <mat-icon>download</mat-icon> Export
+          </button>
+          <mat-menu #exportMenu="matMenu">
+            <button mat-menu-item (click)="exportProjectsExcel()"><mat-icon>description</mat-icon> Export Excel (.xlsx)</button>
+            <button mat-menu-item (click)="exportProjectsPDF()"><mat-icon>picture_as_pdf</mat-icon> Export PDF (.pdf)</button>
+          </mat-menu>
+
+          <button mat-stroked-button color="accent" (click)="openBulkUploadModal()">
+            <mat-icon>upload_file</mat-icon> Bulk Import
+          </button>
+
+          <button mat-raised-button color="primary" class="create-btn" (click)="openCreateModal()">
+            <mat-icon>add</mat-icon> Create Project
+          </button>
+        </div>
+      </div>
+
+      <table mat-table [dataSource]="filteredProjects" class="custom-table full-width">
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef> Project Name </th>
+          <td mat-cell *matCellDef="let p"> <strong>{{ p.name }}</strong> </td>
+        </ng-container>
+
+        <ng-container matColumnDef="progress">
+          <th mat-header-cell *matHeaderCellDef> Completion Progress </th>
+          <td mat-cell *matCellDef="let p">
+            <div class="progress-wrapper">
+              <mat-progress-bar mode="determinate" [value]="p.progress" [color]="p.progress === 100 ? 'accent' : 'primary'"></mat-progress-bar>
+              <span class="progress-val">{{ p.progress }}%</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="duration">
+          <th mat-header-cell *matHeaderCellDef> Timeline Duration </th>
+          <td mat-cell *matCellDef="let p">
+            <div class="clickable-date-picker" (click)="$event.stopPropagation()">
+              <input type="date" [value]="p.startDate" class="inline-date-input" (change)="openExtendModal(p, $event)">
+              <span>➔</span>
+              <input type="date" [value]="p.endDate" class="inline-date-input" (change)="openExtendModal(p, $event)">
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="manager">
+          <th mat-header-cell *matHeaderCellDef> Assigned Manager </th>
+          <td mat-cell *matCellDef="let p">
+            <span class="manager-name">{{ p.managerName || 'Unassigned' }}</span>
+            <button mat-button color="primary" class="reassign-btn" type="button" (click)="openReassignModal(p, $event)">
+              <mat-icon>swap_horiz</mat-icon> Reassign
+            </button>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef> Status </th>
+          <td mat-cell *matCellDef="let p"> <span class="badge" [ngClass]="p.status">{{ p.status }}</span> </td>
+        </ng-container>
+
+        <ng-container matColumnDef="details">
+          <th mat-header-cell *matHeaderCellDef> Project Details </th>
+          <td mat-cell *matCellDef="let p">
+            <button mat-stroked-button color="primary" class="view-details-action-btn" (click)="openProjectDetailsModal(p, $event)">
+              View Details
+            </button>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="edit">
+          <th mat-header-cell *matHeaderCellDef> Edit </th>
+          <td mat-cell *matCellDef="let p">
+            <button mat-icon-button color="primary" (click)="openCreateModal(p)" title="Edit Project">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef> Delete </th>
+          <td mat-cell *matCellDef="let p">
+            <button mat-icon-button color="warn" (click)="deleteProject(p.id!, $event)" title="Delete Project"><mat-icon>delete</mat-icon></button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="['name', 'progress', 'duration', 'manager', 'status', 'details', 'edit', 'actions']"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['name', 'progress', 'duration', 'manager', 'status', 'details', 'edit', 'actions'];"></tr>
+      </table>
+      
+      <mat-paginator [pageSize]="10" [pageSizeOptions]="[5, 10, 25]"></mat-paginator>
+    </div>
+
+    <!-- MODULE 2: USER VERIFICATION -->
+    <div class="module-view" *ngIf="activeModule === 'users'">
+      <div class="filter-toolbar">
+        <mat-form-field appearance="outline" class="search-box">
+          <mat-label>Search pending requests...</mat-label>
+          <input matInput [(ngModel)]="userSearchQuery" (keyup)="applyUserFilters()">
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-select">
+          <mat-label>Requested Role</mat-label>
+          <mat-select [(ngModel)]="selectedRoleFilter" (selectionChange)="applyUserFilters()">
+            <mat-option value="ALL">All Roles</mat-option>
+            <mat-option value="ROLE_PROJECT_MANAGER">Project Manager</mat-option>
+            <mat-option value="ROLE_EMPLOYEE">Employee</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <table mat-table [dataSource]="filteredPendingUsers" class="custom-table full-width">
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef> Full Name </th>
+          <td mat-cell *matCellDef="let u"> {{ u.name }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="email">
+          <th mat-header-cell *matHeaderCellDef> Email Address </th>
+          <td mat-cell *matCellDef="let u"> {{ u.email }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="role">
+          <th mat-header-cell *matHeaderCellDef> Requested Role </th>
+          <td mat-cell *matCellDef="let u"> <span class="role-pill">{{ u.role }}</span> </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef> Action </th>
+          <td mat-cell *matCellDef="let u">
+            <button mat-raised-button color="primary" (click)="approveUser(u.id)">Approve User</button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="['name', 'email', 'role', 'actions']"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['name', 'email', 'role', 'actions'];"></tr>
+      </table>
+    </div>
+
+    <!-- MODULE 3: PROJECT TEAM & ALLOCATION MODULE (INSIDE MAIN CONTENT) -->
+    <div class="module-view" *ngIf="activeModule === 'team-allocation'">
+      <div class="team-module-container">
+        <!-- Top Toolbar Header with Right-Corner Allocation Button -->
+        <div class="team-header-card">
+          <div>
+            <h3>Project Team Allocation Hub</h3>
+            <p>View currently assigned Project Managers and Employees, or allocate new teams using the button.</p>
+          </div>
+          <button mat-raised-button color="primary" class="allocation-trigger-btn" (click)="openTeamAllocationModal()">
+            <mat-icon>group_add</mat-icon> Project Team Allocation
+          </button>
+        </div>
+
+        <!-- Cart Style Cards Layout for Allocated Teams -->
+        <div class="cart-grid-container">
+          <div *ngFor="let team of allocatedTeamsList" class="team-cart-card">
+            <div class="cart-card-header">
+              <div class="project-title-badge">
+                <mat-icon>folder_special</mat-icon>
+                <span>{{ team.projectName }}</span>
+              </div>
+              <div class="cart-actions-group">
+                <button mat-icon-button color="primary" (click)="openTeamAllocationModal(team)" title="Edit Team">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button color="warn" (click)="deleteAllocatedTeam(team.id)" title="Delete Team">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </div>
+
+            <div class="cart-card-body">
+              <div class="cart-manager-row">
+                <span class="label">Project Manager:</span>
+                <span class="val manager-highlight">{{ team.managerName }}</span>
+              </div>
+              <div class="cart-employees-section">
+                <span class="label">Assigned Team Members:</span>
+                <div class="employee-pills-wrap">
+                  <span *ngFor="let emp of team.employees" class="emp-pill">
+                    <mat-icon style="font-size: 14px; width: 14px; height: 14px;">person</mat-icon> {{ emp }}
+                  </span>
+                  <span *ngIf="!team.employees || team.employees.length === 0" class="no-emp-text">No members assigned</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODULE 4: USER DETAILS & SECURITY -->
+    <div class="module-view" *ngIf="activeModule === 'user-details'">
+      <div class="filter-toolbar user-security-toolbar flex-wrap gap-3">
+        <mat-form-field appearance="outline" class="search-box">
+          <mat-label>Search users by name or email...</mat-label>
+          <input matInput [(ngModel)]="userManagementSearchQuery" (keyup)="applyUserManagementFilters()">
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-select">
+          <mat-label>Filter by Role</mat-label>
+          <mat-select [(ngModel)]="selectedUserRoleFilter" (selectionChange)="applyUserManagementFilters()">
+            <mat-option value="ALL">All Roles (Non-Admin)</mat-option>
+            <mat-option value="EMPLOYEE">Employees</mat-option>
+            <mat-option value="PROJECT_MANAGER">Project Managers</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <div class="three-types-filter-group">
+          <button mat-stroked-button [class.active-filter-pill]="selectedUserStatusFilter === 'ALL Users'" (click)="setSystemUserFilter('ALL Users')">
+            All Users
+          </button>
+          <button mat-stroked-button [class.active-filter-pill]="selectedUserStatusFilter === 'Active Only'" (click)="setSystemUserFilter('Active Only')">
+            Active Only
+          </button>
+          <button mat-stroked-button [class.active-filter-pill]="selectedUserStatusFilter === 'Blocked Only'" (click)="setSystemUserFilter('Blocked Only')">
+            Blocked Only
+          </button>
+        </div>
+      </div>
+
+      <table mat-table [dataSource]="filteredSystemUsers" class="custom-table full-width">
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef> User Name </th>
+          <td mat-cell *matCellDef="let user"> <strong>{{ user.name }}</strong> </td>
+        </ng-container>
+
+        <ng-container matColumnDef="email">
+          <th mat-header-cell *matHeaderCellDef> Contact Email </th>
+          <td mat-cell *matCellDef="let user"> 
+            <a [href]="'mailto:' + user.email" class="contact-email-link" title="Click to send email">
+              <mat-icon style="font-size:16px; width:16px; height:16px; vertical-align:middle;">email</mat-icon> {{ user.email }}
+            </a>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="role">
+          <th mat-header-cell *matHeaderCellDef> Role </th>
+          <td mat-cell *matCellDef="let user"> <span class="role-pill">{{ user.role }}</span> </td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef> Access Status / Reason </th>
+          <td mat-cell *matCellDef="let user">
+            <span *ngIf="!user.isBlocked" class="badge ACTIVE">Active</span>
+            <div *ngIf="user.isBlocked" class="blocked-status-box">
+              <span class="badge PLANNED" style="background:#fee2e2; color:#b91c1c; border-color:#f87171;">Blocked</span>
+              <small class="block-reason-alert">Reason: <strong>{{ user.blockReason }}</strong></small>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef> Security Actions </th>
+          <td mat-cell *matCellDef="let user">
+            <button *ngIf="!user.isBlocked" mat-stroked-button color="warn" (click)="openBlockUserModal(user)">
+              <mat-icon>block</mat-icon> Block
+            </button>
+            <button *ngIf="user.isBlocked" mat-raised-button color="primary" (click)="unblockUser(user)">
+              <mat-icon>lock_open</mat-icon> Unblock
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="['name', 'email', 'role', 'status', 'actions']"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['name', 'email', 'role', 'status', 'actions'];"></tr>
+      </table>
+    </div>
+
+    <!-- MODULE 5: AUDIT LOGS -->
+    <div class="module-view" *ngIf="activeModule === 'audit'">
+      <div class="filter-toolbar">
+        <mat-form-field appearance="outline" class="search-box">
+          <mat-label>Search audit logs...</mat-label>
+          <input matInput [(ngModel)]="auditSearchQuery" (keyup)="applyAuditFilters()">
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-select">
+          <mat-label>Year</mat-label>
+          <mat-select [(ngModel)]="selectedAuditYear" (selectionChange)="applyAuditFilters()">
+            <mat-option value="ALL">All Years</mat-option>
+            <mat-option *ngFor="let y of yearsList" [value]="y">{{ y }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-select">
+          <mat-label>Month</mat-label>
+          <mat-select [(ngModel)]="selectedAuditMonth" (selectionChange)="applyAuditFilters()">
+            <mat-option *ngFor="let m of monthsList" [value]="m.val">{{ m.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-select">
+          <mat-label>Action Type</mat-label>
+          <mat-select [(ngModel)]="selectedActionFilter" (selectionChange)="applyAuditFilters()">
+            <mat-option value="ALL">All Actions</mat-option>
+            <mat-option value="PROJECT_CREATED">Project Created</mat-option>
+            <mat-option value="USER_APPROVED">User Approved</mat-option>
+            <mat-option value="MANAGER_REASSIGNED">Manager Reassigned</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <button mat-stroked-button [matMenuTriggerFor]="auditExportMenu">
+          <mat-icon>download</mat-icon> Export Audit Log
+        </button>
+        <mat-menu #auditExportMenu="matMenu">
+          <button mat-menu-item (click)="openAuditExportModal('EXCEL')">
+            <mat-icon>description</mat-icon> Export Excel (.xlsx)
+          </button>
+          <button mat-menu-item (click)="openAuditExportModal('PDF')">
+            <mat-icon>picture_as_pdf</mat-icon> Export PDF (.pdf)
+          </button>
+        </mat-menu>
+      </div>
+
+      <table mat-table [dataSource]="filteredAuditLogs" class="custom-table full-width">
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef> Action </th>
+          <td mat-cell *matCellDef="let log"> <strong>{{ log.action }}</strong> </td>
+        </ng-container>
+
+        <ng-container matColumnDef="performedBy">
+          <th mat-header-cell *matHeaderCellDef> Performed By </th>
+          <td mat-cell *matCellDef="let log"> {{ log.performedBy }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="details">
+          <th mat-header-cell *matHeaderCellDef> Details </th>
+          <td mat-cell *matCellDef="let log"> {{ log.details }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="timestamp">
+          <th mat-header-cell *matHeaderCellDef> Timestamp </th>
+          <td mat-cell *matCellDef="let log"> {{ log.timestamp | date:'medium' }} </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="['action', 'performedBy', 'details', 'timestamp']"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['action', 'performedBy', 'details', 'timestamp'];"></tr>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<!-- ALL MODALS AT THE VERY BOTTOM -->
+
+<!-- PROJECT TEAM ALLOCATION FORM MODAL -->
+<div *ngIf="showTeamAllocationModal" class="modal-overlay" (click)="closeTeamAllocationModal()">
+  <div class="modal-card modal-styled" (click)="$event.stopPropagation()">
+    <div class="modal-header-banner">
+      <div class="banner-title-box">
+        <mat-icon class="banner-icon">group_work</mat-icon>
+        <div>
+          <h3>{{ isEditingAllocation ? 'Edit Team Allocation' : 'Project Team Allocation Form' }}</h3>
+          <p>Assign project manager and team members</p>
+        </div>
+      </div>
+      <button mat-icon-button class="close-banner-btn" (click)="closeTeamAllocationModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="modal-body-content space-y-4">
+      <mat-form-field appearance="outline" class="full-width" style="width: 100%;">
+        <mat-label>Project Name</mat-label>
+        <input matInput [(ngModel)]="newAllocationForm.projectName" placeholder="Enter project name..." required>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width" style="width: 100%;">
+        <mat-label>Select Project Manager (PM)</mat-label>
+        <mat-select [(ngModel)]="newAllocationForm.managerId">
+          <mat-option *ngFor="let pm of managers" [value]="pm.name">{{ pm.name }} ({{ pm.email }})</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <div class="flex items-center gap-2">
+        <mat-form-field appearance="outline" style="flex: 1; margin-bottom: -1.25em;">
+          <mat-label>Select Employee</mat-label>
+          <mat-select [(ngModel)]="newAllocationForm.employeeId">
+            <mat-option *ngFor="let emp of employeesList" [value]="emp.name">{{ emp.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button mat-raised-button color="accent" type="button" (click)="addEmployeeToCart()" style="height: 52px; font-weight: 700;">
+          <mat-icon>add</mat-icon> Add
+        </button>
+      </div>
+
+      <div class="cart-preview-box mt-3">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Assigned Team Cart ({{ selectedTeamEmployeesCart.length }})</span>
+        <div class="flex flex-wrap gap-2">
+          <span *ngFor="let empName of selectedTeamEmployeesCart" class="emp-cart-pill">
+            {{ empName }} 
+            <button type="button" (click)="removeEmployeeFromCart(empName)" class="ml-1 text-rose-500 font-bold hover:text-rose-700">&times;</button>
+          </span>
+          <span *ngIf="selectedTeamEmployeesCart.length === 0" class="text-xs text-slate-400 italic">No employees added yet. Select and click Add.</span>
+        </div>
+      </div>
+
+      <div class="modal-actions mt-4">
+        <button mat-button type="button" (click)="closeTeamAllocationModal()">Cancel</button>
+        <button mat-raised-button color="primary" type="button" (click)="saveTeamAllocationForm()">
+          {{ isEditingAllocation ? 'Update Team' : 'Submit Allocation' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGER REASSIGNMENT MODAL -->
+<div *ngIf="showReassignModal && selectedProjectToReassign" class="modal-overlay" (click)="closeReassignModal()">
+  <div class="modal-card modal-styled" (click)="$event.stopPropagation()">
+    <div class="modal-header-banner">
+      <div class="banner-title-box">
+        <mat-icon class="banner-icon">swap_horiz</mat-icon>
+        <div>
+          <h3>Reassign Project Manager</h3>
+          <p>Project: {{ selectedProjectToReassign.name }}</p>
+        </div>
+      </div>
+      <button mat-icon-button class="close-banner-btn" (click)="closeReassignModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    
+    <div class="modal-body-content space-y-4">
+      <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 16px;">
+        <mat-label>Select New Project Manager</mat-label>
+        <mat-select [(ngModel)]="newSelectedManagerId">
+          <mat-option *ngFor="let m of managers" [value]="m.id">{{ m.name }} ({{ m.email }})</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 16px;">
+        <mat-label>Reassignment Reason</mat-label>
+        <mat-select [(ngModel)]="selectedReasonPreset">
+          <mat-option *ngFor="let reason of reassignReasonPresets" [value]="reason">{{ reason }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <div class="modal-actions">
+        <button mat-button (click)="closeReassignModal()">Cancel</button>
+        <button mat-raised-button color="primary" (click)="confirmReassignment()">Confirm Reassignment</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BLOCK USER MODAL -->
+<div *ngIf="showBlockUserModal" class="modal-overlay" (click)="closeBlockUserModal()">
+  <div class="modal-card modal-styled" (click)="$event.stopPropagation()">
+    <div class="modal-header-banner" style="background: linear-gradient(135deg, #991b1b, #dc2626);">
+      <div class="banner-title-box">
+        <mat-icon class="banner-icon" style="color: #fca5a5;">block</mat-icon>
+        <div>
+          <h3>Block User Account</h3>
+          <p>Select reason to restrict login for: {{ selectedUserToBlock?.name }}</p>
+        </div>
+      </div>
+      <button mat-icon-button class="close-banner-btn" (click)="closeBlockUserModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="modal-body-content">
+      <p class="modal-subtitle">This reason will be displayed instantly when the user attempts to log in to the workspace.</p>
+      
+      <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 20px;">
+        <mat-label>Select Block Reason</mat-label>
+        <mat-select [(ngModel)]="selectedBlockReason">
+          <mat-option *ngFor="let reason of blockReasonOptions" [value]="reason">{{ reason }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <div class="modal-actions">
+        <button mat-button (click)="closeBlockUserModal()">Cancel</button>
+        <button mat-raised-button color="warn" (click)="confirmBlockUser()">Confirm Block & Alert</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE / EDIT PROJECT MODAL -->
+<div *ngIf="showCreateModal" class="modal-overlay" (click)="closeCreateModal()">
+  <div class="modal-card modal-styled" (click)="$event.stopPropagation()">
+    <div class="modal-header-banner">
+      <div class="banner-title-box">
+        <mat-icon class="banner-icon">inventory_2</mat-icon>
+        <div>
+          <h3>{{ newProject.id ? 'Edit Project' : 'Create New Project' }}</h3>
+          <p>Fill in the project specifications below</p>
+        </div>
+      </div>
+      <button mat-icon-button class="close-banner-btn" (click)="closeCreateModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="modal-body-content">
+      <form (ngSubmit)="saveProject()">
+        <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 12px;">
+          <mat-label>Project Name</mat-label>
+          <input matInput [(ngModel)]="newProject.name" name="name" required>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 12px;">
+          <mat-label>Description</mat-label>
+          <textarea matInput [(ngModel)]="newProject.description" name="description" rows="3"></textarea>
+        </mat-form-field>
+
+        <!-- Start Date Field (Outline Styled & Clickable Calendar) -->
+        <div style="margin-bottom: 16px; position: relative;">
+          <label style="position: absolute; top: -8px; left: 12px; font-size: 12px; font-weight: 500; color: #4f46e5; background: #ffffff; padding: 0 4px; z-index: 1;">Start Date*</label>
+          <input type="date" [(ngModel)]="newProject.startDate" name="startDate" required style="width: 100%; height: 56px; padding: 0 16px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; background: #ffffff; color: #0f172a; outline: none; box-sizing: border-box; cursor: pointer;">
+        </div>
+
+        <!-- End Date Field (Outline Styled & Clickable Calendar) -->
+        <div style="margin-bottom: 16px; position: relative;">
+          <label style="position: absolute; top: -8px; left: 12px; font-size: 12px; font-weight: 500; color: #64748b; background: #ffffff; padding: 0 4px; z-index: 1;">End Date</label>
+          <input type="date" [(ngModel)]="newProject.endDate" name="endDate" style="width: 100%; height: 56px; padding: 0 16px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; background: #ffffff; color: #0f172a; outline: none; box-sizing: border-box; cursor: pointer;">
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 12px;">
+          <mat-label>Status</mat-label>
+          <mat-select [(ngModel)]="newProject.status" name="status">
+            <mat-option value="PLANNED">PLANNED</mat-option>
+            <mat-option value="ACTIVE">ACTIVE</mat-option>
+            <mat-option value="COMPLETED">COMPLETED</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 16px;">
+          <mat-label>Assigned Manager</mat-label>
+          <mat-select [(ngModel)]="newProject.managerId" name="managerId" required>
+            <mat-option *ngFor="let m of managers" [value]="m.id">{{ m.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px;">
+          <button mat-button type="button" (click)="closeCreateModal()">Cancel</button>
+          <button mat-raised-button color="primary" type="submit">{{ newProject.id ? 'Update Project' : 'Create Project' }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- HIGH-END PROJECT DETAILS MODAL -->
+<div *ngIf="showProjectDetailsModal && selectedProjectForDetails" class="modal-overlay" (click)="closeProjectDetailsModal()">
+  <div class="modal-card modal-styled modal-large" (click)="$event.stopPropagation()">
+    <div class="modal-header-banner">
+      <div class="banner-title-box">
+        <mat-icon class="banner-icon">inventory_2</mat-icon>
+        <div>
+          <h3>{{ selectedProjectForDetails.name }}</h3>
+          <p>Assigned Manager: {{ selectedProjectForDetails.managerName || 'Unassigned' }}</p>
+        </div>
+      </div>
+      <button mat-icon-button class="close-banner-btn" (click)="closeProjectDetailsModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="modal-body-content">
+      <div class="details-grid">
+        <div class="detail-box">
+          <span class="detail-label">Status</span>
+          <span class="badge" [ngClass]="selectedProjectForDetails.status">{{ selectedProjectForDetails.status }}</span>
+        </div>
+        <div class="detail-box">
+          <span class="detail-label">Timeline Duration</span>
+          <strong>{{ selectedProjectForDetails.startDate || 'N/A' }} ➔ {{ selectedProjectForDetails.endDate || 'N/A' }}</strong>
+        </div>
+      </div>
+      <div class="description-section">
+        <h3>Project Description</h3>
+        <p>{{ selectedProjectForDetails.description || 'No detailed description provided.' }}</p>
+      </div>
+      <div class="modal-tracker-box">
+        <div class="tracker-header">
+          <span>Completion Progress</span>
+          <span>{{ selectedProjectForDetails.progress }}%</span>
+        </div>
+        <mat-progress-bar mode="determinate" [value]="selectedProjectForDetails.progress"></mat-progress-bar>
+      </div>
+      <div class="tasks-breakdown-section">
+        <h3>Associated Deliverables & Tasks ({{ projectAssociatedTasks.length }})</h3>
+        <div class="tasks-scroll-list">
+          <div *ngFor="let t of projectAssociatedTasks" class="task-row-item" (click)="openTaskDetailsModal(t, $event)">
+            <div>
+              <strong>{{ t.title }}</strong>
+              <small>Project: {{ t.projectName || selectedProjectForDetails.name }} | Assignee: {{ t.assignedUserName || 'Unassigned' }}</small>
+            </div>
+            <div class="task-row-badges">
+              <span class="priority-pill" [ngClass]="t.priority">{{ t.priority }}</span>
+              <span class="status-pill">{{ t.status }}</span>
+            </div>
+          </div>
+          <div *ngIf="projectAssociatedTasks.length === 0" class="no-items-text">
+            No tasks found for this project yet.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TASK DETAILS & DISCUSSION MODAL -->
+<div *ngIf="showTaskDetailsModal && selectedTaskForDetails" class="modal-overlay" (click)="closeTaskDetailsModal()">
+  <div class="modal-card modal-styled" (click)="$event.stopPropagation()">
+    <div class="modal-header-banner">
+      <div class="banner-title-box">
+        <mat-icon class="banner-icon">assignment</mat-icon>
+        <div>
+          <h3>{{ selectedTaskForDetails.title }}</h3>
+          <p>Project: {{ selectedTaskForDetails.projectName || 'General Project' }}</p>
+        </div>
+      </div>
+      <button mat-icon-button class="close-banner-btn" (click)="closeTaskDetailsModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="modal-body-content">
+      <div class="details-grid">
+        <div class="detail-box">
+          <span class="detail-label">Status</span>
+          <strong>{{ selectedTaskForDetails.status }}</strong>
+        </div>
+        <div class="detail-box">
+          <span class="detail-label">Priority</span>
+          <span class="priority-badge" [ngClass]="selectedTaskForDetails.priority">{{ selectedTaskForDetails.priority }}</span>
+        </div>
+        <div class="detail-box">
+          <span class="detail-label">Due Date</span>
+          <strong>{{ selectedTaskForDetails.dueDate }}</strong>
+        </div>
+        <div class="detail-box">
+          <span class="detail-label">Assigned Member</span>
+          <strong>{{ selectedTaskForDetails.assignedUserName || 'Unassigned' }}</strong>
+        </div>
+      </div>
+      <div class="discussion-section">
+        <h3>Team Discussion & Activity Feed</h3>
+        <div class="comments-scroll-area">
+          <div *ngFor="let comment of modalCommentsList" class="modal-comment-card" [class.system-card]="comment.message.startsWith('System:')">
+            <div class="comment-author-row">
+              <div class="author-info">
+                <strong>{{ comment.createdByName || 'Team Member' }}</strong>
+                <span class="role-badge" [class]="getUserRoleBadge(comment.createdByName).toLowerCase()">
+                  {{ getUserRoleBadge(comment.createdByName) }}
+                </span>
+              </div>
+              <span class="comment-time">{{ comment.createdTime | date:'short' }}</span>
+            </div>
+            <p class="comment-text">{{ comment.message }}</p>
+          </div>
+          <div *ngIf="modalCommentsList.length === 0" class="no-items-text">
+            No discussion history yet. Be the first to post an update!
+          </div>
+        </div>
+        <div class="modal-comment-input">
+          <input type="text" [(ngModel)]="modalCommentText" (keyup.enter)="postModalComment()" placeholder="Post a comment or update as ADMIN...">
+          <button (click)="postModalComment()">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BULK EXCEL UPLOAD & IMPORT MODAL -->
+<div *ngIf="showBulkUploadModal" class="modal-overlay" (click)="showBulkUploadModal = false">
+  <div class="modal-card modal-styled modal-large" (click)="$event.stopPropagation()">
+    <div class="modal-header-banner" style="background: linear-gradient(135deg, #065f46, #059669);">
+      <div class="banner-title-box">
+        <mat-icon class="banner-icon" style="color: #6ee7b7;">upload_file</mat-icon>
+        <div>
+          <h3>Bulk Project Import (Excel / CSV)</h3>
+          <p>Upload a spreadsheet to import multiple projects simultaneously</p>
+        </div>
+      </div>
+      <button mat-icon-button class="close-banner-btn" (click)="showBulkUploadModal = false">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="modal-body-content space-y-4">
+      <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div>
+          <strong class="text-slate-800 text-sm block">Need the standard format?</strong>
+          <span class="text-xs text-slate-500">Download our sample template containing required columns (ProjectName, Description, Status, ManagerEmail).</span>
+        </div>
+        <button mat-stroked-button color="primary" (click)="downloadSampleTemplate()" style="font-weight: 700;">
+          <mat-icon>download</mat-icon> Sample Template
+        </button>
+      </div>
+
+      <div class="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer relative">
+        <input type="file" (change)="onFileSelected($event)" accept=".xlsx, .xls, .csv" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+        <mat-icon style="font-size: 40px; width: 40px; height: 40px; color: #059669; margin-bottom: 8px;">cloud_upload</mat-icon>
+        <h4 class="text-slate-700 font-bold text-sm">Click to browse or drag and drop your Excel file here</h4>
+        <p class="text-xs text-slate-400 mt-1">Supports .xlsx, .xls, and .csv formats</p>
+      </div>
+
+      <div *ngIf="bulkValidationErrors.length > 0" class="bg-rose-50 border border-rose-200 p-4 rounded-xl text-rose-700 text-xs space-y-1">
+        <strong>Validation Warnings / Errors:</strong>
+        <p *ngFor="let err of bulkValidationErrors">{{ err }}</p>
+      </div>
+
+      <div *ngIf="parsedBulkRows.length > 0" class="space-y-2">
+        <span class="text-xs font-bold text-slate-600 uppercase tracking-wider block">Preview Parsed Rows ({{ parsedBulkRows.length }})</span>
+        <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-xl">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-slate-100 text-slate-700 sticky top-0">
+              <tr>
+                <th class="p-3">Project Name</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Manager Email</th>
+                <th class="p-3">Parse Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr *ngFor="let row of parsedBulkRows" [class.bg-rose-50]="!row.isValid">
+                <td class="p-3 font-semibold text-slate-800">{{ row.name }}</td>
+                <td class="p-3">{{ row.status }}</td>
+                <td class="p-3">{{ row.managerId ? 'Found' : 'Missing Manager' }}</td>
+                <td class="p-3 font-bold" [ngClass]="row.isValid ? 'text-emerald-600' : 'text-rose-600'">
+                  {{ row.reason }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-actions pt-2">
+        <button mat-button (click)="showBulkUploadModal = false">Cancel</button>
+        <button mat-raised-button color="primary" [disabled]="parsedBulkRows.length === 0" (click)="confirmBulkImport()" style="font-weight: 700;">
+          Import Valid Projects
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,78 @@
+<mat-toolbar class="navbar">
+  <!-- Brand Logo -->
+  <div class="brand-logo">
+    <mat-icon class="brand-icon">admin_panel_settings</mat-icon>
+    <span>TaskManager Suite</span>
+  </div>
+
+  <span class="spacer"></span>
+
+  <div class="navbar-right-container">
+    <!-- NOTIFICATION BELL & POPUP MENU -->
+    <div class="notification-wrapper">
+      <button mat-icon-button class="notify-bell-btn" [matMenuTriggerFor]="notifyMenu">
+        <mat-icon class="bell-icon">notifications</mat-icon>
+        <span class="unread-badge" *ngIf="unreadCount > 0">{{ unreadCount }}</span>
+      </button>
+
+      <mat-menu #notifyMenu="matMenu" class="notification-menu">
+        <div class="notify-header" (click)="$event.stopPropagation()">
+          <div class="notify-title-group">
+            <mat-icon>notifications_active</mat-icon>
+            <strong>Notifications ({{ unreadCount }})</strong>
+          </div>
+          <button mat-button class="clear-btn" (click)="clearNotifications()" *ngIf="unreadCount > 0">Clear All</button>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <div class="notify-list">
+          <div *ngFor="let notification of notifications" class="notify-item" (click)="onNotificationClick(notification)">
+            <mat-icon class="notify-status-icon" [ngClass]="notification.type">fiber_manual_record</mat-icon>
+            <div class="notify-text">
+              <span class="notify-item-title">{{ notification.title }}</span>
+              <span class="notify-time">{{ notification.time }}</span>
+            </div>
+            <mat-icon class="arrow-icon">chevron_right</mat-icon>
+          </div>
+
+          <div *ngIf="notifications.length === 0" class="empty-notify">
+            <mat-icon class="empty-icon">check_circle</mat-icon>
+            <span>No new notifications</span>
+          </div>
+        </div>
+      </mat-menu>
+    </div>
+
+    <!-- THEME TOGGLE BUTTON -->
+    <button mat-icon-button class="theme-toggle-btn" (click)="toggleTheme()" [title]="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+      <mat-icon>{{ isDarkMode ? 'light_mode' : 'dark_mode' }}</mat-icon>
+    </button>
+
+   <!-- USER PROFILE PILL WITH LEFT-ALIGNED UPLOAD AVATAR -->
+<div class="user-info" title="Click avatar to update profile picture" (click)="fileInput.click()">
+  <!-- Hidden File Input -->
+  <input type="file" #fileInput style="display: none;" accept="image/*" (change)="onAvatarSelected($event)">
+  
+  <!-- Left Avatar Bubble (Upload Trigger) -->
+  <div class="user-avatar">
+    <img *ngIf="userAvatarUrl" [src]="'http://localhost:8080' + userAvatarUrl" alt="Avatar" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+    <span *ngIf="!userAvatarUrl">{{ userName.charAt(0) | uppercase }}</span>
+    <div class="avatar-edit-overlay">
+      <mat-icon style="font-size: 14px; width: 14px; height: 14px;">camera_alt</mat-icon>
+    </div>
+  </div>
+
+  <!-- Right Details Section (Name & Role) -->
+  <div class="user-details">
+    <span class="user-name">{{ userName }}</span>
+    <span class="role-badge">{{ role }}</span>
+  </div>
+</div>
+
+    <!-- LOGOUT BUTTON -->
+    <button mat-stroked-button class="logout-btn" (click)="onLogout()">
+      <mat-icon>logout</mat-icon> Logout
+    </button>
+  </div>
+</mat-toolbar>

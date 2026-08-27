@@ -1,0 +1,50 @@
+<div class="auth-page-container">
+  <mat-card class="auth-card">
+    <mat-card-header class="auth-header">
+      <mat-icon class="brand-icon">person_add</mat-icon>
+      <mat-card-title>Request Account Access</mat-card-title>
+      <mat-card-subtitle>Create your Enterprise Task Suite account</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="alert-box error" *ngIf="errorMessage">{{ errorMessage }}</div>
+      <div class="alert-box success" *ngIf="successMessage">{{ successMessage }}</div>
+
+      <form [formGroup]="registerForm" (ngSubmit)="onRegister()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Full Name</mat-label>
+          <input matInput formControlName="name" placeholder="John Doe">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Email Address</mat-label>
+          <input matInput formControlName="email" type="email" placeholder="name@company.com">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Password</mat-label>
+          <input matInput [type]="hidePassword ? 'password' : 'text'" formControlName="password">
+          <button mat-icon-button matSuffix type="button" (click)="togglePassword()">
+            <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Select Role</mat-label>
+          <mat-select formControlName="role">
+            <mat-option value="ROLE_EMPLOYEE">Employee</mat-option>
+            <mat-option value="ROLE_PROJECT_MANAGER">Project Manager</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <button mat-raised-button color="primary" class="full-width submit-btn" type="submit" [disabled]="registerForm.invalid">
+          Submit Access Request
+        </button>
+      </form>
+
+      <div class="footer-link">
+        Already have an account? <a routerLink="/login">Sign In</a>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

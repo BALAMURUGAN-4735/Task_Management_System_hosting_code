@@ -1,0 +1,324 @@
+<app-navbar></app-navbar>
+
+<div class="dashboard-wrapper">
+  
+  <!-- PAGE HEADER & WEEKLY CAPACITY TRACKER -->
+  <div class="header-section">
+    <div>
+      <h1 class="page-title">Employee Portal — Workspace</h1>
+      <p class="subtitle">Track assigned tasks, log project hours, and collaborate in real time.</p>
+    </div>
+
+    <!-- WEEKLY CAPACITY WIDGET -->
+    <div class="weekly-capacity-card">
+      <div class="capacity-header">
+        <mat-icon class="capacity-icon">schedule</mat-icon>
+        <div>
+          <span class="capacity-title">Weekly Capacity Log</span>
+          <span class="capacity-value">{{ weeklyCapacity.logged }} / {{ weeklyCapacity.target }} hrs</span>
+        </div>
+      </div>
+      <mat-progress-bar mode="determinate" [value]="getCapacityPercentage()" class="capacity-bar"></mat-progress-bar>
+    </div>
+
+    <!-- VIEW MODE SWITCHER -->
+    <div class="view-toggle-container">
+      <button class="toggle-btn" [class.active]="viewMode === 'grid'" (click)="viewMode = 'grid'">
+        <mat-icon>grid_view</mat-icon> Grid View
+      </button>
+      <button class="toggle-btn" [class.active]="viewMode === 'kanban'" (click)="viewMode = 'kanban'">
+        <mat-icon>view_kanban</mat-icon> Kanban Board
+      </button>
+    </div>
+  </div>
+
+  <!-- GLASSMORPHISM KPI SUMMARY CARDS -->
+  <div class="kpi-grid">
+    <div class="kpi-card total" [class.active]="selectedStatus === 'ALL'" (click)="quickFilterByStatus('ALL')">
+      <div class="kpi-icon"><mat-icon>assignment</mat-icon></div>
+      <div class="kpi-details">
+        <span class="kpi-value">{{ stats.total }}</span>
+        <span class="kpi-label">Total Assigned</span>
+      </div>
+    </div>
+
+    <div class="kpi-card progress" [class.active]="selectedStatus === 'IN_PROGRESS'" (click)="quickFilterByStatus('IN_PROGRESS')">
+      <div class="kpi-icon"><mat-icon>autorenew</mat-icon></div>
+      <div class="kpi-details">
+        <span class="kpi-value">{{ stats.inProgress }}</span>
+        <span class="kpi-label">In Progress</span>
+      </div>
+    </div>
+
+    <div class="kpi-card completed" [class.active]="selectedStatus === 'COMPLETED'" (click)="quickFilterByStatus('COMPLETED')">
+      <div class="kpi-icon"><mat-icon>check_circle</mat-icon></div>
+      <div class="kpi-details">
+        <span class="kpi-value">{{ stats.completed }}</span>
+        <span class="kpi-label">Completed</span>
+      </div>
+    </div>
+
+    <div class="kpi-card overdue" [class.active]="selectedStatus === 'OVERDUE'" (click)="quickFilterByStatus('OVERDUE')">
+      <div class="kpi-icon"><mat-icon>warning</mat-icon></div>
+      <div class="kpi-details">
+        <span class="kpi-value">{{ stats.overdue }}</span>
+        <span class="kpi-label">Overdue Tasks</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEARCH & ADVANCED FILTER TOOLBAR -->
+  <div class="filter-toolbar">
+    <div class="search-box">
+      <mat-icon>search</mat-icon>
+      <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()" placeholder="Search tasks by title, project, or description...">
+    </div>
+
+    <div class="dropdown-group">
+      <select [(ngModel)]="selectedPriority" (change)="applyFilters()" class="custom-select">
+        <option value="ALL">All Priorities</option>
+        <option value="URGENT">🔴 Urgent</option>
+        <option value="HIGH">🟠 High</option>
+        <option value="MEDIUM">🟡 Medium</option>
+        <option value="LOW">🟢 Low</option>
+      </select>
+
+      <select [(ngModel)]="selectedStatus" (change)="applyFilters()" class="custom-select">
+        <option value="ALL">All Statuses</option>
+        <option value="TODO">📋 TODO</option>
+        <option value="IN_PROGRESS">⚡ IN PROGRESS</option>
+        <option value="COMPLETED">✅ COMPLETED</option>
+        <option value="OVERDUE">⚠️ OVERDUE</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ACTIVE FILTER CHIPS BAR -->
+  <div *ngIf="searchQuery || selectedPriority !== 'ALL' || selectedStatus !== 'ALL'" class="active-chips-bar">
+    <span class="chips-label">Active Filters:</span>
+    <span *ngIf="searchQuery" class="chip">Search: "{{ searchQuery }}" <mat-icon (click)="clearFilter('search')">close</mat-icon></span>
+    <span *ngIf="selectedPriority !== 'ALL'" class="chip">Priority: {{ selectedPriority }} <mat-icon (click)="clearFilter('priority')">close</mat-icon></span>
+    <span *ngIf="selectedStatus !== 'ALL'" class="chip">Status: {{ selectedStatus }} <mat-icon (click)="clearFilter('status')">close</mat-icon></span>
+    <button (click)="clearAllFilters()" class="clear-all-btn">Clear All</button>
+  </div>
+
+  <!-- VIEW MODE 1: GRID CARDS VIEW -->
+  <div *ngIf="viewMode === 'grid'" class="grid-layout">
+    <div *ngFor="let task of filteredTasks" class="task-card" [class.overdue-border]="isOverdue(task)" [class.completed-card]="task.status === 'COMPLETED'">
+      
+      <!-- CARD HEADER -->
+      <div class="card-header">
+        <span class="project-tag">{{ task.projectName || 'General Project' }}</span>
+        <div class="header-badges">
+          <span *ngIf="task.status === 'COMPLETED'" class="completed-badge">✓ Done</span>
+          <span class="priority-badge" [class]="task.priority.toLowerCase()">{{ task.priority }}</span>
+        </div>
+      </div>
+
+      <h3 class="task-title">{{ task.title }}</h3>
+      <p class="task-desc">{{ task.description || 'No detailed description provided.' }}</p>
+
+      <!-- PROGRESS & TIME TRACKER -->
+      <div class="tracker-section" (click)="$event.stopPropagation()">
+        <div class="tracker-labels">
+          <span>Progress ({{ getProgressPercentage(task) }}%)</span>
+          <span>{{ task.loggedHours || 0 }} / {{ task.estimatedHours || 8 }} hrs</span>
+        </div>
+        <mat-progress-bar mode="determinate" [value]="getProgressPercentage(task)" [color]="task.status === 'COMPLETED' ? 'accent' : 'primary'"></mat-progress-bar>
+        
+        <!-- INTERACTIVE HOUR LOGGING -->
+        <div class="time-logger" *ngIf="task.status !== 'COMPLETED'">
+          <input type="number" min="1" max="10" placeholder="+ hrs" [(ngModel)]="logHoursMap[task.id!]" class="time-input">
+          <button (click)="logTaskHours(task, $event)" class="log-btn">+ Log Time</button>
+        </div>
+      </div>
+
+      <!-- STATUS SELECTOR & DUE DATE -->
+      <div class="status-footer" (click)="$event.stopPropagation()">
+        <div class="status-selector">
+          <label>Status</label>
+          <select [ngModel]="task.status" (ngModelChange)="updateStatus(task, $event)" class="status-select">
+            <option value="TODO">TODO</option>
+            <option value="IN_PROGRESS">IN_PROGRESS</option>
+            <option value="COMPLETED">COMPLETED</option>
+          </select>
+        </div>
+
+        <div class="due-date-box" [class.text-danger]="isOverdue(task)">
+          <mat-icon>event</mat-icon>
+          <span>Due: {{ task.dueDate }}</span>
+        </div>
+      </div>
+
+      <!-- ATTRACTIVE VIEW DETAILS BUTTON -->
+      <div class="card-action-footer">
+        <button class="view-details-btn" (click)="openTaskDetailsModal(task, $event)">
+          <mat-icon class="btn-icon">visibility</mat-icon>
+          <span>View Task Details & Discussion</span>
+          <mat-icon class="arrow-icon">arrow_forward</mat-icon>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- VIEW MODE 2: KANBAN BOARD VIEW -->
+  <div *ngIf="viewMode === 'kanban'" class="kanban-layout">
+    
+    <!-- TODO COLUMN -->
+    <div class="kanban-column">
+      <div class="column-header todo">
+        <span>📋 TODO</span>
+        <span class="count">{{ getTasksByStatus('TODO').length }}</span>
+      </div>
+      <div class="kanban-cards">
+        <div *ngFor="let t of getTasksByStatus('TODO')" class="kanban-card">
+          <span class="project-tag-small">{{ t.projectName }}</span>
+          <h4>{{ t.title }}</h4>
+          <div class="kanban-card-footer">
+            <span class="priority-badge-small" [class]="t.priority.toLowerCase()">{{ t.priority }}</span>
+            <button (click)="updateStatus(t, 'IN_PROGRESS', $event)" class="move-btn">Start ⚡</button>
+          </div>
+          <button class="kanban-details-btn" (click)="openTaskDetailsModal(t, $event)">Details →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- IN_PROGRESS COLUMN -->
+    <div class="kanban-column">
+      <div class="column-header in-progress">
+        <span>⚡ IN PROGRESS</span>
+        <span class="count">{{ getTasksByStatus('IN_PROGRESS').length }}</span>
+      </div>
+      <div class="kanban-cards">
+        <div *ngFor="let t of getTasksByStatus('IN_PROGRESS')" class="kanban-card">
+          <span class="project-tag-small">{{ t.projectName }}</span>
+          <h4>{{ t.title }}</h4>
+          <div class="kanban-card-footer">
+            <button (click)="updateStatus(t, 'TODO', $event)" class="move-btn-outline">↩️ Todo</button>
+            <button (click)="updateStatus(t, 'COMPLETED', $event)" class="move-btn complete">Mark Done ✅</button>
+          </div>
+          <button class="kanban-details-btn" (click)="openTaskDetailsModal(t, $event)">Details →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPLETED COLUMN -->
+    <div class="kanban-column">
+      <div class="column-header completed">
+        <span>✅ COMPLETED</span>
+        <span class="count">{{ getTasksByStatus('COMPLETED').length }}</span>
+      </div>
+      <div class="kanban-cards">
+        <div *ngFor="let t of getTasksByStatus('COMPLETED')" class="kanban-card done">
+          <span class="project-tag-small">{{ t.projectName }}</span>
+          <h4>{{ t.title }}</h4>
+          <div class="kanban-card-footer">
+            <button (click)="updateStatus(t, 'IN_PROGRESS', $event)" class="move-btn-outline">Reopen ↩️</button>
+            <span class="completed-check">✓ Done</span>
+          </div>
+          <button class="kanban-details-btn" (click)="openTaskDetailsModal(t, $event)">Details →</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- HIGH-END TASK DETAILS MODAL -->
+<div *ngIf="showTaskDetailsModal && selectedTaskForDetails" class="modal-overlay" (click)="closeTaskDetailsModal()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+    
+    <!-- MODAL HEADER -->
+    <div class="modal-header">
+      <div>
+        <span class="project-badge">{{ selectedTaskForDetails.projectName || 'General Project' }}</span>
+        <h2 class="modal-title">{{ selectedTaskForDetails.title }}</h2>
+      </div>
+      <button class="close-btn" (click)="closeTaskDetailsModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <!-- MODAL BODY METRICS -->
+    <div class="modal-body">
+      
+      <div class="details-grid">
+        <div class="detail-box">
+          <span class="detail-label">Status</span>
+          <select [ngModel]="selectedTaskForDetails.status" (ngModelChange)="updateStatus(selectedTaskForDetails, $event)" class="status-select-large">
+            <option value="TODO">📋 TODO</option>
+            <option value="IN_PROGRESS">⚡ IN_PROGRESS</option>
+            <option value="COMPLETED">✅ COMPLETED</option>
+          </select>
+        </div>
+
+        <div class="detail-box">
+          <span class="detail-label">Priority</span>
+          <span class="priority-pill" [class]="selectedTaskForDetails.priority.toLowerCase()">{{ selectedTaskForDetails.priority }}</span>
+        </div>
+
+        <div class="detail-box">
+          <span class="detail-label">Due Date</span>
+          <span class="due-pill" [class.text-danger]="isOverdue(selectedTaskForDetails)">
+            <mat-icon>event</mat-icon> {{ selectedTaskForDetails.dueDate }}
+          </span>
+        </div>
+
+        <div class="detail-box">
+          <span class="detail-label">Assigned Member</span>
+          <span class="assignee-pill">{{ selectedTaskForDetails.assignedUserName || 'John Developer' }}</span>
+        </div>
+      </div>
+
+      <!-- DESCRIPTION SECTION -->
+      <div class="description-section">
+        <h3>Description</h3>
+        <p>{{ selectedTaskForDetails.description || 'No description provided for this task.' }}</p>
+      </div>
+
+      <!-- HOURS TRACKER -->
+      <div class="modal-tracker-box">
+        <div class="tracker-header">
+          <span>Logged Work: {{ selectedTaskForDetails.loggedHours || 0 }} / {{ selectedTaskForDetails.estimatedHours || 8 }} hrs</span>
+          <span>{{ getProgressPercentage(selectedTaskForDetails) }}% Complete</span>
+        </div>
+        <mat-progress-bar mode="determinate" [value]="getProgressPercentage(selectedTaskForDetails)" class="modal-progress"></mat-progress-bar>
+      </div>
+
+      <!-- DISCUSSION FEED (EMP / PM / ADMIN BADGES) -->
+      <div class="discussion-section">
+        <h3>Team Discussion & Activity Trail</h3>
+
+        <div class="comments-scroll-area">
+          <div *ngFor="let comment of modalCommentsList" class="modal-comment-card" [class.system-card]="comment.message.startsWith('System:')">
+            <div class="comment-author-row">
+              <div class="author-info">
+                <strong>{{ comment.createdByName || 'Team Member' }}</strong>
+                <span class="role-badge" [class]="getUserRoleBadge(comment.createdByName).toLowerCase()">
+                  {{ getUserRoleBadge(comment.createdByName) }}
+                </span>
+              </div>
+              <span class="comment-time">{{ comment.createdTime | date:'short' }}</span>
+            </div>
+            <p class="comment-text">{{ comment.message }}</p>
+          </div>
+
+          <div *ngIf="modalCommentsList.length === 0" class="no-comments-placeholder">
+            No discussion history yet. Be the first to post an update!
+          </div>
+        </div>
+
+        <!-- POST COMMENT INPUT -->
+        <div class="modal-comment-input">
+          <input type="text" [(ngModel)]="modalCommentText" (keyup.enter)="postModalComment()" placeholder="Post a comment or progress update as EMP/PM/Admin...">
+          <button (click)="postModalComment()">Send Note</button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+</div>

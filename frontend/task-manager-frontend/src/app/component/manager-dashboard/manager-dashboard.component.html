@@ -1,0 +1,555 @@
+<app-navbar></app-navbar>
+
+<div class="pm-container">
+  <!-- TOP HEADER TOOLBAR -->
+  <div class="pm-header">
+    <div>
+      <h2>Project Manager Control Center</h2>
+      <p class="subtitle">Welcome back, <strong>{{ currentUserName }}</strong>. Workspace overview for assigned projects.</p>
+    </div>
+
+    <div class="header-actions">
+      <div class="toggle-group">
+        <button 
+          mat-button 
+          [class.active-toggle]="viewMode === 'table'" 
+          (click)="viewMode = 'table'">
+          <mat-icon>table_chart</mat-icon> Table View
+        </button>
+        <button 
+          mat-button 
+          [class.active-toggle]="viewMode === 'kanban'" 
+          (click)="viewMode = 'kanban'">
+          <mat-icon>view_kanban</mat-icon> Kanban Board
+        </button>
+      </div>
+
+      <button mat-stroked-button class="bulk-btn" (click)="openBulkModal()">
+        <mat-icon>upload_file</mat-icon> Bulk Upload Tasks
+      </button>
+
+      <button mat-raised-button color="primary" class="create-btn" (click)="openCreateModal()">
+        <mat-icon>add_task</mat-icon> Create & Assign Task
+      </button>
+    </div>
+  </div>
+
+  <!-- PROJECT SELECTOR & OVERVIEW METRICS BAR -->
+  <div class="project-selector-bar">
+    <div class="selector-box">
+      <label class="select-label">📁 Filter Assigned Project:</label>
+      <select [(ngModel)]="selectedProjectId" (change)="applyProjectFilter()" class="project-dropdown">
+        <option value="ALL">All Assigned Projects ({{ projects.length }})</option>
+        <option *ngFor="let p of projects" [value]="p.id">{{ p.name }}</option>
+      </select>
+    </div>
+
+    <div class="metrics-summary">
+      <div class="metric-item">
+        <span class="m-val">{{ projectStats.total }}</span>
+        <span class="m-lbl">Total Tasks</span>
+      </div>
+      <div class="metric-item">
+        <span class="m-val progress-color">{{ projectStats.inProgress }}</span>
+        <span class="m-lbl">In Progress</span>
+      </div>
+      <div class="metric-item">
+        <span class="m-val completed-color">{{ projectStats.completed }}</span>
+        <span class="m-lbl">Completed</span>
+      </div>
+      <div class="metric-item" *ngIf="projectStats.overdue > 0">
+        <span class="m-val overdue-color">{{ projectStats.overdue }}</span>
+        <span class="m-lbl">Overdue</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADVANCED FILTER TOOLBAR -->
+  <div class="filter-toolbar" *ngIf="viewMode === 'table'">
+    <div class="filter-group search-box">
+      <mat-icon class="search-icon">search</mat-icon>
+      <input 
+        type="text" 
+        placeholder="Search task title or description..." 
+        [(ngModel)]="filterSearchQuery" 
+        (input)="applyProjectFilter()"
+        class="filter-input">
+    </div>
+
+    <div class="filter-group">
+      <label>Priority:</label>
+      <select [(ngModel)]="filterPriority" (change)="applyProjectFilter()" class="filter-select">
+        <option value="ALL">All Priorities</option>
+        <option value="URGENT">URGENT</option>
+        <option value="HIGH">HIGH</option>
+        <option value="MEDIUM">MEDIUM</option>
+        <option value="LOW">LOW</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Status:</label>
+      <select [(ngModel)]="filterStatus" (change)="applyProjectFilter()" class="filter-select">
+        <option value="ALL">All Statuses</option>
+        <option value="TODO">TODO</option>
+        <option value="IN_PROGRESS">IN_PROGRESS</option>
+        <option value="COMPLETED">COMPLETED</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Assignee:</label>
+      <select [(ngModel)]="filterAssigneeId" (change)="applyProjectFilter()" class="filter-select">
+        <option value="ALL">All Team Members</option>
+        <option *ngFor="let emp of employees" [value]="emp.id">{{ emp.name }}</option>
+      </select>
+    </div>
+
+    <button mat-button class="reset-filter-btn" (click)="resetAdvancedFilters()">
+      <mat-icon>refresh</mat-icon> Reset Filters
+    </button>
+  </div>
+
+  <!-- TEAM WORKLOAD & CAPACITY ALERT SUMMARY CARDS -->
+  <div class="workload-section">
+    <h3>📊 Team Task Allocation & Capacity</h3>
+    <div class="workload-grid">
+      <div class="workload-card" *ngFor="let member of workloadSummary">
+        <div class="workload-info">
+          <span class="member-name">{{ member.employeeName }}</span>
+          <span class="task-badge" [class.overload-badge]="member.isOverloaded">
+            {{ member.taskCount }} Active Tasks {{ member.isOverloaded ? '⚠️ Overloaded' : '' }}
+          </span>
+        </div>
+        <mat-progress-bar mode="determinate" [value]="member.percentage" [color]="member.isOverloaded ? 'warn' : 'primary'"></mat-progress-bar>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLE VIEW -->
+  <div class="view-container" *ngIf="viewMode === 'table'">
+    <table mat-table [dataSource]="dataSource" class="custom-table full-width">
+      <ng-container matColumnDef="title">
+        <th mat-header-cell *matHeaderCellDef> Task Details </th>
+        <td mat-cell *matCellDef="let t">
+          <strong class="task-title-text">{{ t.title }}</strong>
+          <div class="project-tag">Project: {{ t.projectName || 'General Project' }}</div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="assignedTo">
+        <th mat-header-cell *matHeaderCellDef> Assigned Member </th>
+        <td mat-cell *matCellDef="let t">
+          <div class="assignee-box">
+            <span class="assignee-name">{{ t.assignedUserName || 'Unassigned' }}</span>
+            <button mat-icon-button color="primary" (click)="openReassignModal(t, $event)" title="Reassign Task">
+              <mat-icon>swap_horiz</mat-icon>
+            </button>
+          </div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="priority">
+        <th mat-header-cell *matHeaderCellDef> Priority </th>
+        <td mat-cell *matCellDef="let t">
+          <span class="priority-badge" [ngClass]="t.priority">{{ t.priority }}</span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="hours">
+        <th mat-header-cell *matHeaderCellDef> Hours Tracker </th>
+        <td mat-cell *matCellDef="let t">
+          <div class="hours-box">
+            <span>{{ t.loggedHours || 0 }} / {{ t.estimatedHours || 8 }} hrs</span>
+            <span class="over-budget" *ngIf="(t.loggedHours || 0) > (t.estimatedHours || 8)">⚠️ Over Budget</span>
+          </div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef> Status Progress </th>
+        <td mat-cell *matCellDef="let t">
+          <div class="status-pill-select" [ngClass]="t.status">
+            <select [value]="t.status" (change)="updateTaskStatus(t, $any($event.target).value, $event)">
+              <option value="TODO">📌 TODO</option>
+              <option value="IN_PROGRESS">⚡ IN_PROGRESS</option>
+              <option value="COMPLETED">✅ COMPLETED</option>
+            </select>
+          </div>
+        </td>
+      </ng-container>
+
+      <!-- VIEW DETAILS COLUMN -->
+      <ng-container matColumnDef="details">
+        <th mat-header-cell *matHeaderCellDef> Task Details </th>
+        <td mat-cell *matCellDef="let t">
+          <button mat-stroked-button color="primary" class="view-details-action-btn" (click)="openTaskDetailsModal(t, $event)">
+            View Details
+          </button>
+        </td>
+      </ng-container>
+
+      <!-- EDIT TASK COLUMN -->
+      <ng-container matColumnDef="edit">
+        <th mat-header-cell *matHeaderCellDef> Edit Task </th>
+        <td mat-cell *matCellDef="let t">
+          <button mat-icon-button color="primary" (click)="openCreateModal(t)" title="Edit Task">
+            <mat-icon>edit</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="dueDate">
+        <th mat-header-cell *matHeaderCellDef> Due Date </th>
+        <td mat-cell *matCellDef="let t"> {{ t.dueDate }} </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="['title', 'assignedTo', 'priority', 'hours', 'status', 'details', 'edit', 'dueDate']"></tr>
+      <tr mat-row *matRowDef="let row; columns: ['title', 'assignedTo', 'priority', 'hours', 'status', 'details', 'edit', 'dueDate'];"></tr>
+    </table>
+  </div>
+
+  <!-- KANBAN BOARD VIEW -->
+  <div class="kanban-wrapper" *ngIf="viewMode === 'kanban'">
+    <div class="stage-tabs">
+      <button class="stage-tab-btn" [class.active-stage]="kanbanStageTab === 'ALL'" (click)="kanbanStageTab = 'ALL'">
+        🌐 All Stages
+      </button>
+      <button class="stage-tab-btn todo-tab" [class.active-stage]="kanbanStageTab === 'TODO'" (click)="kanbanStageTab = 'TODO'">
+        📌 TODO ({{ getTasksByStatus('TODO').length }})
+      </button>
+      <button class="stage-tab-btn progress-tab" [class.active-stage]="kanbanStageTab === 'IN_PROGRESS'" (click)="kanbanStageTab = 'IN_PROGRESS'">
+        ⚡ IN PROGRESS ({{ getTasksByStatus('IN_PROGRESS').length }})
+      </button>
+      <button class="stage-tab-btn completed-tab" [class.active-stage]="kanbanStageTab === 'COMPLETED'" (click)="kanbanStageTab = 'COMPLETED'">
+        ✅ COMPLETED ({{ getTasksByStatus('COMPLETED').length }})
+      </button>
+    </div>
+
+    <div class="kanban-board" [class.single-column-mode]="kanbanStageTab !== 'ALL'">
+      <div class="kanban-column todo" *ngIf="kanbanStageTab === 'ALL' || kanbanStageTab === 'TODO'">
+        <div class="column-header">
+          <span class="col-title">📌 TODO</span>
+          <span class="count-pill">{{ getTasksByStatus('TODO').length }}</span>
+        </div>
+        <div class="kanban-cards">
+          <mat-card class="kanban-card" *ngFor="let t of getTasksByStatus('TODO')" (click)="openTaskDetailsModal(t)">
+            <div class="card-header-row">
+              <span class="priority-badge" [ngClass]="t.priority">{{ t.priority }}</span>
+              <span class="due-text">{{ t.dueDate }}</span>
+            </div>
+            <h4 class="card-title">{{ t.title }}</h4>
+            <p class="card-project">Project: {{ t.projectName }}</p>
+            <div class="card-footer" (click)="$event.stopPropagation()">
+              <span class="assignee">👤 {{ t.assignedUserName || 'Unassigned' }}</span>
+              <button mat-button color="accent" class="move-btn" (click)="updateTaskStatus(t, 'IN_PROGRESS', $event)">Start ➔</button>
+            </div>
+            <button class="kanban-details-btn" (click)="openTaskDetailsModal(t, $event)">Details →</button>
+          </mat-card>
+        </div>
+      </div>
+
+      <div class="kanban-column progress" *ngIf="kanbanStageTab === 'ALL' || kanbanStageTab === 'IN_PROGRESS'">
+        <div class="column-header">
+          <span class="col-title">⚡ IN PROGRESS</span>
+          <span class="count-pill">{{ getTasksByStatus('IN_PROGRESS').length }}</span>
+        </div>
+        <div class="kanban-cards">
+          <mat-card class="kanban-card" *ngFor="let t of getTasksByStatus('IN_PROGRESS')" (click)="openTaskDetailsModal(t)">
+            <div class="card-header-row">
+              <span class="priority-badge" [ngClass]="t.priority">{{ t.priority }}</span>
+              <span class="due-text">{{ t.dueDate }}</span>
+            </div>
+            <h4 class="card-title">{{ t.title }}</h4>
+            <p class="card-project">Project: {{ t.projectName }}</p>
+            <div class="card-footer" (click)="$event.stopPropagation()">
+              <span class="assignee">👤 {{ t.assignedUserName || 'Unassigned' }}</span>
+              <button mat-button color="primary" class="move-btn" (click)="updateTaskStatus(t, 'COMPLETED', $event)">Complete ✓</button>
+            </div>
+            <button class="kanban-details-btn" (click)="openTaskDetailsModal(t, $event)">Details →</button>
+          </mat-card>
+        </div>
+      </div>
+
+      <div class="kanban-column completed" *ngIf="kanbanStageTab === 'ALL' || kanbanStageTab === 'COMPLETED'">
+        <div class="column-header">
+          <span class="col-title">✅ COMPLETED</span>
+          <span class="count-pill">{{ getTasksByStatus('COMPLETED').length }}</span>
+        </div>
+        <div class="kanban-cards">
+          <mat-card class="kanban-card" *ngFor="let t of getTasksByStatus('COMPLETED')" (click)="openTaskDetailsModal(t)">
+            <div class="card-header-row">
+              <span class="priority-badge" [ngClass]="t.priority">{{ t.priority }}</span>
+              <span class="due-text">{{ t.dueDate }}</span>
+            </div>
+            <h4 class="card-title done">{{ t.title }}</h4>
+            <p class="card-project">Project: {{ t.projectName }}</p>
+            <div class="card-footer">
+              <span class="assignee">👤 {{ t.assignedUserName || 'Unassigned' }}</span>
+              <span class="done-label">Finished</span>
+            </div>
+            <button class="kanban-details-btn" (click)="openTaskDetailsModal(t, $event)">Details →</button>
+          </mat-card>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE / EDIT TASK MODAL -->
+<div *ngIf="showCreateModal" class="modal-overlay" (click)="closeCreateModal()">
+  <div class="modal-card modal-styled" (click)="$event.stopPropagation()">
+    <div class="modal-header-banner">
+      <div class="banner-title-box">
+        <mat-icon class="banner-icon">add_task</mat-icon>
+        <div>
+          <h3>{{ newTask.id ? 'Edit Task' : 'Create New Task' }}</h3>
+          <p>Configure task attributes below</p>
+        </div>
+      </div>
+      <button mat-icon-button class="close-banner-btn" (click)="closeCreateModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="modal-body-content">
+      <form (ngSubmit)="saveTask()">
+        <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 12px;">
+          <mat-label>Task Title</mat-label>
+          <input matInput [(ngModel)]="newTask.title" name="title" required>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 12px;">
+          <mat-label>Description</mat-label>
+          <textarea matInput [(ngModel)]="newTask.description" name="description" rows="3"></textarea>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 12px;">
+          <mat-label>Project</mat-label>
+          <mat-select [(ngModel)]="newTask.projectId" name="projectId" required>
+            <mat-option *ngFor="let p of projects" [value]="p.id">{{ p.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 12px;">
+          <mat-label>Assign To Employee</mat-label>
+          <mat-select [(ngModel)]="newTask.assignedUserId" name="assignedUserId" required>
+            <mat-option *ngFor="let emp of employees" [value]="emp.id">{{ emp.name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 12px;">
+          <mat-label>Priority</mat-label>
+          <mat-select [(ngModel)]="newTask.priority" name="priority">
+            <mat-option value="LOW">LOW</mat-option>
+            <mat-option value="MEDIUM">MEDIUM</mat-option>
+            <mat-option value="HIGH">HIGH</mat-option>
+            <mat-option value="URGENT">URGENT</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <!-- Due Date Field (Outline Styled & Clickable Calendar Picker) -->
+        <div style="margin-bottom: 16px; position: relative;">
+          <label style="position: absolute; top: -8px; left: 12px; font-size: 12px; font-weight: 500; color: #4f46e5; background: #ffffff; padding: 0 4px; z-index: 1;">Due Date*</label>
+          <input type="date" [(ngModel)]="newTask.dueDate" name="dueDate" required style="width: 100%; height: 56px; padding: 0 16px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; background: #ffffff; color: #0f172a; outline: none; box-sizing: border-box; cursor: pointer;">
+        </div>
+
+        <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px;">
+          <button mat-button type="button" (click)="closeCreateModal()">Cancel</button>
+          <button mat-raised-button color="primary" type="submit">{{ newTask.id ? 'Update Task' : 'Create Task' }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- TASK DETAILS & DISCUSSION MODAL -->
+<div *ngIf="showTaskDetailsModal && selectedTaskForDetails" class="modal-overlay" (click)="closeTaskDetailsModal()">
+  <div class="modal-card modal-styled" (click)="$event.stopPropagation()">
+    <div class="modal-header-banner">
+      <div class="banner-title-box">
+        <mat-icon class="banner-icon">assignment</mat-icon>
+        <div>
+          <h3>{{ selectedTaskForDetails.title }}</h3>
+          <p>Project: {{ selectedTaskForDetails.projectName || 'General Project' }}</p>
+        </div>
+      </div>
+      <button mat-icon-button class="close-banner-btn" (click)="closeTaskDetailsModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="modal-body-content">
+      <div class="details-grid">
+        <div class="detail-box">
+          <span class="detail-label">Status</span>
+          <strong>{{ selectedTaskForDetails.status }}</strong>
+        </div>
+        <div class="detail-box">
+          <span class="detail-label">Priority</span>
+          <span class="priority-badge" [ngClass]="selectedTaskForDetails.priority">{{ selectedTaskForDetails.priority }}</span>
+        </div>
+        <div class="detail-box">
+          <span class="detail-label">Due Date</span>
+          <span class="due-pill" [class.text-danger]="isOverdue(selectedTaskForDetails)">
+            <mat-icon>event</mat-icon> {{ selectedTaskForDetails.dueDate }}
+          </span>
+        </div>
+        <div class="detail-box">
+          <span class="detail-label">Assigned Member</span>
+          <span class="assignee-pill">{{ selectedTaskForDetails.assignedUserName || 'Unassigned' }}</span>
+        </div>
+      </div>
+
+      <div class="description-section">
+        <h3>Description</h3>
+        <p>{{ selectedTaskForDetails.description || 'No description provided.' }}</p>
+      </div>
+
+      <div class="modal-tracker-box">
+        <div class="tracker-header">
+          <span>Logged Work: {{ selectedTaskForDetails.loggedHours || 0 }} / {{ selectedTaskForDetails.estimatedHours || 8 }} hrs</span>
+          <span>{{ getProgressPercentage(selectedTaskForDetails) }}% Complete</span>
+        </div>
+        <mat-progress-bar mode="determinate" [value]="getProgressPercentage(selectedTaskForDetails)"></mat-progress-bar>
+      </div>
+
+      <div class="discussion-section">
+        <h3>Team Discussion & Activity Trail</h3>
+        <div class="comments-scroll-area">
+          <div *ngFor="let comment of modalCommentsList" class="modal-comment-card" [class.system-card]="comment.message.startsWith('System:')">
+            <div class="comment-author-row">
+              <div class="author-info">
+                <strong>{{ comment.createdByName || 'Team Member' }}</strong>
+                <span class="role-badge" [class]="getUserRoleBadge(comment.createdByName).toLowerCase()">
+                  {{ getUserRoleBadge(comment.createdByName) }}
+                </span>
+              </div>
+              <span class="comment-time">{{ comment.createdTime | date:'short' }}</span>
+            </div>
+            <p class="comment-text">{{ comment.message }}</p>
+          </div>
+          <div *ngIf="modalCommentsList.length === 0" class="no-items-text">
+            No discussion history yet. Be the first to post an update!
+          </div>
+        </div>
+
+        <div class="modal-comment-input">
+          <input type="text" [(ngModel)]="modalCommentText" (keyup.enter)="postModalComment()" placeholder="Post a comment or instruction as MANAGER...">
+          <button (click)="postModalComment()">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BULK EXCEL UPLOAD & IMPORT MODAL -->
+<div *ngIf="showBulkModal" class="modal-overlay" (click)="closeBulkModal()">
+  <div class="modal-card modal-styled modal-large" (click)="$event.stopPropagation()">
+    <div class="modal-header-banner" style="background: linear-gradient(135deg, #065f46, #059669);">
+      <div class="banner-title-box">
+        <mat-icon class="banner-icon" style="color: #6ee7b7;">upload_file</mat-icon>
+        <div>
+          <h3>Bulk Task Import (Excel / CSV)</h3>
+          <p>Upload a spreadsheet with built-in validation dropdowns to assign multiple tasks</p>
+        </div>
+      </div>
+      <button mat-icon-button class="close-banner-btn" (click)="closeBulkModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="modal-body-content space-y-4">
+      <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div>
+          <strong class="text-slate-800 text-sm block">Download Interactive Template</strong>
+          <span class="text-xs text-slate-500">Includes active database dropdown lists for Projects, Team Members, Priorities, and Statuses.</span>
+        </div>
+        <button mat-stroked-button color="primary" (click)="downloadExcelTemplate()" style="font-weight: 700;">
+          <mat-icon>download</mat-icon> Download Template
+        </button>
+      </div>
+
+      <!-- File Drop / Select Area -->
+      <div class="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer relative">
+        <input type="file" (change)="onFileUpload($event)" accept=".xlsx, .xls, .csv" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+        <mat-icon style="font-size: 40px; width: 40px; height: 40px; color: #059669; margin-bottom: 8px;">cloud_upload</mat-icon>
+        <h4 class="text-slate-700 font-bold text-sm">
+          {{ uploadedFileName ? 'Selected File: ' + uploadedFileName : 'Click to browse or drag and drop your completed spreadsheet' }}
+        </h4>
+        <p class="text-xs text-slate-400 mt-1">Supports .xlsx, .xls, and .csv formats</p>
+      </div>
+
+      <!-- Validation Errors Box -->
+      <div *ngIf="bulkValidationErrors.length > 0" class="bg-rose-50 border border-rose-200 p-4 rounded-xl text-rose-700 text-xs space-y-1 max-h-36 overflow-y-auto">
+        <strong>Validation Warnings / Errors Found:</strong>
+        <p *ngFor="let err of bulkValidationErrors">{{ err }}</p>
+      </div>
+
+      <!-- Parsed Data Preview Table -->
+      <div *ngIf="parsedBulkTasks.length > 0" class="space-y-2">
+        <span class="text-xs font-bold text-slate-600 uppercase tracking-wider block">Successfully Parsed Tasks Preview ({{ parsedBulkTasks.length }})</span>
+        <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-xl">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-slate-100 text-slate-700 sticky top-0">
+              <tr>
+                <th class="p-3">Title</th>
+                <th class="p-3">Project</th>
+                <th class="p-3">Assignee</th>
+                <th class="p-3">Priority</th>
+                <th class="p-3">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr *ngFor="let task of parsedBulkTasks">
+                <td class="p-3 font-semibold text-slate-800">{{ task.title }}</td>
+                <td class="p-3">{{ task.projectName }}</td>
+                <td class="p-3">{{ task.assignedUserName }}</td>
+                <td class="p-3"><span class="priority-badge" [ngClass]="task.priority">{{ task.priority }}</span></td>
+                <td class="p-3">{{ task.status }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-actions pt-2 flex justify-end gap-3">
+        <button mat-button (click)="closeBulkModal()">Cancel</button>
+        <button mat-raised-button color="primary" [disabled]="!isBulkUploadValid || parsedBulkTasks.length === 0" (click)="submitBulkTasks()" style="font-weight: 700;">
+          Import {{ parsedBulkTasks.length }} Tasks
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TASK REASSIGNMENT MODAL -->
+<div *ngIf="showReassignModal && selectedTaskToReassign" class="modal-overlay" (click)="closeReassignModal()">
+  <div class="modal-card modal-styled" (click)="$event.stopPropagation()">
+    <div class="modal-header-banner">
+      <div class="banner-title-box">
+        <mat-icon class="banner-icon">swap_horiz</mat-icon>
+        <div>
+          <h3>Reassign Task Assignee</h3>
+          <p>Task: {{ selectedTaskToReassign.title }}</p>
+        </div>
+      </div>
+      <button mat-icon-button class="close-banner-btn" (click)="closeReassignModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    
+    <div class="modal-body-content space-y-4">
+      <mat-form-field appearance="outline" class="full-width" style="width: 100%; margin-bottom: 16px;">
+        <mat-label>Select New Team Member</mat-label>
+        <mat-select [(ngModel)]="newAssignedEmployeeId">
+          <mat-option *ngFor="let emp of employees" [value]="emp.id">{{ emp.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <div class="modal-actions flex justify-end gap-3">
+        <button mat-button (click)="closeReassignModal()">Cancel</button>
+        <button mat-raised-button color="primary" (click)="confirmReassignment()" style="font-weight: 700;">Confirm Reassignment</button>
+      </div>
+    </div>
+  </div>
+</div>
